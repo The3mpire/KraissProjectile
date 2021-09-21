@@ -1,6 +1,8 @@
-﻿#pragma once=
+﻿#pragma once
+
 #include "GameFramework/MovementComponent.h"
 
+#include "KraissProjectileMovementComponent.generated.h"
 
 // delegates for the projectile itself to subscribe to handle teardown
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnProjectileStopDelegate, const FHitResult&, ImpactResult);
@@ -36,7 +38,7 @@ public:
 	UPROPERTY(EditAnywhere)
 	bool bHasFriction;
 
-	UPROPERTY(EditAnywhere, EditCondition="bHasFriction")
+	UPROPERTY(EditAnywhere, meta = (EditCondition="bHasFriction"))
 	float Friction;
 
 	UPROPERTY(EditAnywhere)
@@ -44,35 +46,35 @@ public:
 
 	// total number of objects (walls, people, flowers, holy hand grenades) this projectile can go through
 	// inclusive!
-	UPROPERTY(EditAnywhere, EditCondition="bCanPenetrate")
+	UPROPERTY(EditAnywhere, meta = (EditCondition="bCanPenetrate"))
 	int32 MaxPenetrations;
 	
 	// projectile spawner might be a world placed item (turret!), so don't assume pawn is always the instigator
 	UPROPERTY(EditAnywhere)
-	TWeakObjectPtr<AController> Instigator;
-};
+	TWeakObjectPtr<AActor> Instigator;
 
-// TODO: bounces!
-USTRUCT()
-struct FBouncyProjectileDefinition : FBaseProjectileDefinition
-{
-	GENERATED_BODY()
-public:	
+	// TODO: bounces!
+	// should likely be seperated out to a "BounceableProjectile" inheriting from BaseProjectile, since this struct is a bit big
+
+	// whether this projectile can bounce
+	UPROPERTY(EditAnywhere, Category="Bounceable")
+	bool bCanBounce;
+
 	// Percentage of velocity maintained after the bounce in the direction of the normal of impact (coefficient of restitution).
 	// 1.0 = no velocity lost, 0.0 = no bounce
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category="Bounceable", meta = (EditCondition="bCanBounce"))
 	float Bounciness;
 	
 	// Total number of bounces before triggering End of Life effect
 	// -1 means no maxbounces, use lifetime to determine End of Life
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category="Bounceable", meta = (EditCondition="bCanBounce"))
 	int32 MaxBounces;
 
 	// Whether this bouncy projectile will do damage on each bounce 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category="Bounceable", meta = (EditCondition="bCanBounce"))
 	bool bDamagesOnBounce;
 
-	UPROPERTY(EditAnywhere, EditCondition="bDamagesOnBounce")
+	UPROPERTY(EditAnywhere, Category="Bounceable", meta = (EditCondition="bDamagesOnBounce"))
 	float DamageOnBounce;
 };
 

@@ -37,8 +37,15 @@ void UKraissProjectileMovementComponent::TickComponent(float DeltaTime, ELevelTi
 			TotalImpacts++;
 			if (TotalImpacts > ProjectileDefinition.MaxPenetrations)
 			{
-				OnProjectileStop.Broadcast(Hit);			
+				OnProjectileStop.Broadcast(Hit);
 			}
+		}
+		
+		// apply damage
+		// NOTE: making an assumption that something like this exists for damageable items
+		if (IHealthComponentInterface* HealthInterface = Cast<IHealthComponentInterface>(Hit.Item))
+		{
+			UHealthComponentHealthInterface->GetHealthComponent()->ApplyDamage(ProjectileDefinition.Damage);
 		}
 	}
 
@@ -50,7 +57,6 @@ void UKraissProjectileMovementComponent::TickComponent(float DeltaTime, ELevelTi
 	{
 		OnProjectileStop.Broadcast(Hit);	
 	}
-	
 }
 
 // modified from UProjectileMovementComponent.cpp
