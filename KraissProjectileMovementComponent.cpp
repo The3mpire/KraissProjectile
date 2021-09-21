@@ -3,7 +3,18 @@
 
 UKraissProjectileMovementComponent::UKraissProjectileMovementComponent()
 {
-	// assuming the spawner passed the projectile the proper direction when launching the projectile
+	InitialVelocity = FVector::ZeroVector;
+	InitialLocation = GetOwner()->GetActorLocation();
+}
+
+UKraissProjectileMovementComponent::UKraissProjectileMovementComponent(const FVector LaunchVelocity, const FVector LaunchLocation)
+{
+	InitialVelocity = LaunchVelocity;
+	InitialLocation = LaunchLocation;
+	Lifespan = 0.0f;
+	TotalImpacts = 0;
+	
+	// validating data? never heard of her ¯\_(ツ)_/¯
 }
 
 void UKraissProjectileMovementComponent::TickComponent(float DeltaTime, ELevelTick Tick, FActorComponentTickFunction* ThisTickFunction)
@@ -21,21 +32,30 @@ void UKraissProjectileMovementComponent::TickComponent(float DeltaTime, ELevelTi
 	// Handle hit result after movement
 	if (Hit.bBlockingHit)
 	{
-		
+		if (ProjectileDefinition.bCanPenetrate)
+		{
+			TotalImpacts++;
+			if (TotalImpacts > ProjectileDefinition.MaxPenetrations)
+			{
+				OnProjectileStop.Broadcast(Hit);			
+			}
+		}
 	}
+
+	Lifespan += DeltaTime;
+	
+	// check if we have gone too far or been alive too long!
+	const FVector CurrentLocation = GetOwner()->GetActorLocation();
+	if (Lifespan > ProjectileDefinition.Lifetime || FVector::DistSquared(CurrentLocation, InitialLocation) > ProjectileDefinition.MaxDistance)
+	{
+		OnProjectileStop.Broadcast(Hit);	
+	}
+	
 }
 
 // modified from UProjectileMovementComponent.cpp
 FVector UKraissProjectileMovementComponent::ComputeMoveDelta(const FVector& InVelocity, float DeltaTime) const
 {
-	// Velocity Verlet integration (http://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet)
-	// The addition of p0 is done outside this method, we are just computing the delta.
-	// p = p0 + v0*t + 1/2*a*t^2
-
-	// We use ComputeVelocity() here to infer the acceleration, to make it easier to apply custom velocities.
-	// p = p0 + v0*t + 1/2*((v1-v0)/t)*t^2
-	// p = p0 + v0*t + 1/2*((v1-v0))*t
-
 	const FVector NewVelocity = ComputeVelocity(InVelocity, DeltaTime);
 	const FVector Delta = (InVelocity * DeltaTime) + (NewVelocity - InVelocity) * (0.5f * DeltaTime);
 	return Delta;
@@ -44,7 +64,6 @@ FVector UKraissProjectileMovementComponent::ComputeMoveDelta(const FVector& InVe
 // modified from UProjectileMovementComponent.cpp
 FVector UKraissProjectileMovementComponent::ComputeVelocity(FVector InitialVelocity, float DeltaTime) const
 {
-	// v = v0 + a*t
 	const FVector Acceleration = ComputeAcceleration(InitialVelocity, DeltaTime);
 	const FVector NewVelocity = InitialVelocity + (Acceleration * DeltaTime);
 
@@ -57,6 +76,7 @@ FVector UKraissProjectileMovementComponent::ComputeAcceleration(const FVector& I
 	FVector Acceleration(FVector::ZeroVector);
 
 	Acceleration.Z += GetGravityZ();
+	//TODO friction!!
 
 	// TODO: calculate the pending force to add (or 'subtract') for option of gas fueled projectiles
 	// Acceleration += PendingForce;
