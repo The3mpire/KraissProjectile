@@ -30,6 +30,7 @@ public:
 		MaxDistance(MAX_FLT),
 		Damage(0),
 		DamageType(EDamageType::Point),
+		DamageRadius(0),
 		bCanPenetrate(false),
 		MaxPenetrations(0),
 		bCanBounce(false),
@@ -59,9 +60,12 @@ public:
 	UPROPERTY(EditAnywhere)
 	float Damage;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
 	EDamageType DamageType;
 
+	UPROPERTY(EditAnywhere)
+	float DamageRadius;
+	
 	UPROPERTY(EditAnywhere)
 	bool bCanPenetrate;
 
@@ -118,7 +122,11 @@ public:
 	FOnEndOfLifeDelegate OnEndOfLife;
 
 protected:
-	void HandleEndOfLife();
+	void HandleEndOfLife(FHitResult& HitResult);
+
+	void HandleDamage(FHitResult &HitResult);
+
+	TArray<AActor> GetExplosionRadiusItems(FVector StartLocation);
 
 protected:
 	UPROPERTY()

@@ -34,37 +34,64 @@ void UKraissProjectileMovementComponent::TickComponent(float DeltaTime, ELevelTi
 	// Handle hit result after movement
 	if (Hit.bBlockingHit)
 	{
-		UHealthComponent* HealthComponent;
-		// NOTE: making an assumption that something like this exists for damageable items
-		if (IHealthComponentInterface* HealthInterface = Cast<IHealthComponentInterface>(Hit.Item))
-		{
-			HealthComponent = UHealthComponentHealthInterface->GetHealthComponent();
-		}
+		TotalImpacts++;
 		
 		// for now making the assumption that a projectile cannot be bouncy & penetrate
 		// theoretically there could be bouncy materials and penetratable materials :(
 		if (ProjectileDefinition.bCanPenetrate)
 		{
-			TotalImpacts++;
 			if (TotalImpacts > ProjectileDefinition.MaxPenetrations)
 			{
 				OnProjectileStop.Broadcast(Hit);
 				if (ProjectileDefinition.Lifetime > 0) // check if we stay around until the projectile itself decides (throwing knife)
 				{
-					HandleEndOfLife();
+					HandleEndOfLife(Hit);
 				}
 			}
-			// apply damage
 			
+			HandleDamage(Hit);
 		} 
 		else if (ProjectileDefinition.bCanBounce) // we bouncin?
 		{
 			if (ProjectileDefinition.DamageOnBounce > 0)
 			{
-				HealthComponent->ApplyDamage(ProjectileDefinition.DamageOnBounce);
+				// NOTE: making an assumption that something like this exists for damageable items
+				if (IHealthComponentInterface* HealthInterface = Cast<IHealthComponentInterface>(Hit.Item))
+				{
+					HealthInterface->GetHealthComponent()->ApplyDamage(ProjectileDefinition.DamageOnBounce);
+				}
 			}
 
-			// calculate new trajectory
+			if (ProjectileDefinition.MaxBounces > TotalImpacts)
+			{
+				OnProjectileStop.Broadcast(Hit);
+				if (ProjectileDefinition.Lifetime > 0)
+				{
+					HandleEndOfLife(Hit);
+				}
+			}
+			else
+			{
+				//TODO calculate new trajectory & apply. below just calculates, ran out of time TT_TT
+				/** FVector Velocity = HitResult.ImpactVelocity;
+				const FVector Normal = HitResult.Normal;
+				const float VDotNormal = (Velocity | Normal);
+
+				// Only if velocity is opposed by normal or parallel
+				if (VDotNormal <= 0.0f)
+				{
+					// Project velocity onto normal in reflected direction
+					const FVector ProjectedNormal = Normal * -VDotNormal;
+
+					// Point velocity in direction parallel to surface
+					Velocity += ProjectedNormal;
+
+					Velocity *= FMath::Clamp(1.0f - Friction, 0.0f, 1.0f);
+
+					// Coefficient of restitution only applies perpendicular to impact
+					Velocity += ProjectedNormal * Bounciness;
+				} */
+			}
 		}
 	}
 
@@ -78,15 +105,42 @@ void UKraissProjectileMovementComponent::TickComponent(float DeltaTime, ELevelTi
 	}
 }
 
-void UKraissProjectileMovementComponent::HandleEndOfLife()
+void UKraissProjectileMovementComponent::HandleEndOfLife(FHitResult& HitResult)
 {
-	if (ProjectileDefinition.DamageType == EDamageType::Radial)
-	{
-		// TODO sphere sweep for damage to everything we hit
-	}
+	HandleDamage(HitResult);
 
 	// tear down
 	OnEndOfLife.Broadcast();
+}
+
+void UKraissProjectileMovementComponent::HandleDamage(FHitResult& HitResult)
+{
+	UHealthComponent* HealthComponent;
+	// NOTE: making an assumption that something like this exists for damageable items
+	if (IHealthComponentInterface* HealthInterface = Cast<IHealthComponentInterface>(Hit.Item))
+	{
+		HealthComponent = HealthInterface->GetHealthComponent();
+	}
+
+	switch (ProjectileDefinition.DamageType)
+	{
+		case EDamageType::Point:
+			HealthComponent->ApplyDamage(ProjectileDefinition.Damage);
+			break;
+		case EDamageType::Radial:
+			for (AActor DamageableActor : GetExplosionRadiusItems(HitResult.ImpactPoint))
+			{
+				HealthComponent->ApplyDamage(ProjectileDefinition.Damage);
+			}
+			break;
+	}
+	
+}
+
+TArray<AActor> UKraissProjectileMovementComponent::GetExplosionRadiusItems(FVector StartLocation)
+{
+	// sweep from startlocation and grab damageable items in the area
+	// if the explosion can penetrate, grab items "behind"?
 }
 
 // modified from UProjectileMovementComponent.cpp
