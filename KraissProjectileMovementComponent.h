@@ -38,6 +38,7 @@ public:
 		MaxBounces(0),
 		DamageOnBounce(0)
 	{}
+	// drop rate & friction should be design editable
 	
 	// how long this projectile should stay around, a negative number means it should stay indefinitely
 	UPROPERTY(EditAnywhere)
@@ -127,6 +128,13 @@ protected:
 	void HandleDamage(FHitResult &HitResult);
 
 	TArray<AActor> GetExplosionRadiusItems(FVector StartLocation);
+	
+	// Begin modified from UProjectileMovementComponent.cpp 
+	FVector UKraissProjectileMovementComponent::ComputeMoveDelta(const FVector& InVelocity, float DeltaTime) const;
+	FVector UKraissProjectileMovementComponent::ComputeVelocity(FVector InitialVelocity, float DeltaTime) const;
+	FVector UKraissProjectileMovementComponent::ComputeAcceleration(const FVector& InVelocity, float DeltaTime) const;
+	FVector UKraissProjectileMovementComponent::LimitVelocity(FVector NewVelocity) const;
+	// End modified from UProjectileMovementComponent.cpp
 
 protected:
 	UPROPERTY()
@@ -139,11 +147,4 @@ protected:
 	int32 TotalImpacts;
 	
 	float Lifespan;
-
-	// Begin modified from UProjectileMovementComponent.cpp 
-	FVector UKraissProjectileMovementComponent::ComputeMoveDelta(const FVector& InVelocity, float DeltaTime) const;
-	FVector UKraissProjectileMovementComponent::ComputeVelocity(FVector InitialVelocity, float DeltaTime) const;
-	FVector UKraissProjectileMovementComponent::ComputeAcceleration(const FVector& InVelocity, float DeltaTime) const;
-	FVector UKraissProjectileMovementComponent::LimitVelocity(FVector NewVelocity) const;
-	// End modified from UProjectileMovementComponent.cpp
 };
