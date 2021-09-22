@@ -6,15 +6,38 @@
 
 // delegates for the projectile itself to subscribe to handle teardown
 DECLARE_MULTICAST_DELEGATE_OneParam(FOnProjectileStopDelegate, const FHitResult&, ImpactResult);
+DECLARE_MULTICAST_DELEGATE(FOnEndOfLifeDelegate);
 
 //data
 // TODO should override the base HitResult so our subscribers can have better info (could have impact velocity, or if we have critical hits)
+UENUM()
+enum class EDamageType : uint8
+{
+	Point,
+	Radial,
+};
 
 USTRUCT()
 struct FBaseProjectileDefinition
 {
 	GENERATED_BODY()
 public:
+	FBaseProjectileDefinition()
+		: Lifetime(0),
+		InitialSpeed(0),
+		MaxSpeed(0),
+		MinSpeed(0),
+		MaxDistance(MAX_FLT),
+		Damage(0),
+		DamageType(EDamageType::Point),
+		bCanPenetrate(false),
+		MaxPenetrations(0),
+		bCanBounce(false),
+		Bounciness(0.0f),
+		MaxBounces(0),
+		DamageOnBounce(0)
+	{}
+	
 	// how long this projectile should stay around, a negative number means it should stay indefinitely
 	UPROPERTY(EditAnywhere)
 	float Lifetime;
@@ -22,9 +45,11 @@ public:
 	UPROPERTY(EditAnywhere)
 	float InitialSpeed;
 
+	// if no max speed, leave 0
 	UPROPERTY(EditAnywhere)
 	float MaxSpeed;
 
+	// if no min speed, leave 0
 	UPROPERTY(EditAnywhere)
 	float MinSpeed;
 
@@ -34,12 +59,8 @@ public:
 	UPROPERTY(EditAnywhere)
 	float Damage;
 
-	// TODO friction work!
-	UPROPERTY(EditAnywhere)
-	bool bHasFriction;
-
-	UPROPERTY(EditAnywhere, meta = (EditCondition="bHasFriction"))
-	float Friction;
+	UPROPERTY()
+	EDamageType DamageType;
 
 	UPROPERTY(EditAnywhere)
 	bool bCanPenetrate;
@@ -48,16 +69,12 @@ public:
 	// inclusive!
 	UPROPERTY(EditAnywhere, meta = (EditCondition="bCanPenetrate"))
 	int32 MaxPenetrations;
-	
-	// projectile spawner might be a world placed item (turret!), so don't assume pawn is always the instigator
-	UPROPERTY(EditAnywhere)
-	TWeakObjectPtr<AActor> Instigator;
 
 	// TODO: bounces!
 	// should likely be seperated out to a "BounceableProjectile" inheriting from BaseProjectile, since this struct is a bit big
 
 	// whether this projectile can bounce
-	UPROPERTY(EditAnywhere, Category="Bounceable")
+	UPROPERTY(EditAnywhere, Category="Bounceable", meta = (EditCondition="!bCanPenetrate"))
 	bool bCanBounce;
 
 	// Percentage of velocity maintained after the bounce in the direction of the normal of impact (coefficient of restitution).
@@ -70,10 +87,8 @@ public:
 	UPROPERTY(EditAnywhere, Category="Bounceable", meta = (EditCondition="bCanBounce"))
 	int32 MaxBounces;
 
-	// Whether this bouncy projectile will do damage on each bounce 
-	UPROPERTY(EditAnywhere, Category="Bounceable", meta = (EditCondition="bCanBounce"))
-	bool bDamagesOnBounce;
-
+	// Whether this bouncy projectile will do damage on each bounce
+	// 0 means no damage on bounce
 	UPROPERTY(EditAnywhere, Category="Bounceable", meta = (EditCondition="bDamagesOnBounce"))
 	float DamageOnBounce;
 };
@@ -98,6 +113,12 @@ public:
 public:
 	UPROPERTY(BlueprintAssignable)
 	FOnProjectileStopDelegate OnProjectileStop;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnEndOfLifeDelegate OnEndOfLife;
+
+protected:
+	void HandleEndOfLife();
 
 protected:
 	UPROPERTY()

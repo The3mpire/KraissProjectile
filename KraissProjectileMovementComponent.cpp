@@ -1,5 +1,7 @@
 ﻿#include "KraissProjectileMovementComponent.h"
 
+#include <NvParameterized.h>
+
 
 UKraissProjectileMovementComponent::UKraissProjectileMovementComponent()
 {
@@ -32,20 +34,37 @@ void UKraissProjectileMovementComponent::TickComponent(float DeltaTime, ELevelTi
 	// Handle hit result after movement
 	if (Hit.bBlockingHit)
 	{
+		UHealthComponent* HealthComponent;
+		// NOTE: making an assumption that something like this exists for damageable items
+		if (IHealthComponentInterface* HealthInterface = Cast<IHealthComponentInterface>(Hit.Item))
+		{
+			HealthComponent = UHealthComponentHealthInterface->GetHealthComponent();
+		}
+		
+		// for now making the assumption that a projectile cannot be bouncy & penetrate
+		// theoretically there could be bouncy materials and penetratable materials :(
 		if (ProjectileDefinition.bCanPenetrate)
 		{
 			TotalImpacts++;
 			if (TotalImpacts > ProjectileDefinition.MaxPenetrations)
 			{
 				OnProjectileStop.Broadcast(Hit);
+				if (ProjectileDefinition.Lifetime > 0) // check if we stay around until the projectile itself decides (throwing knife)
+				{
+					HandleEndOfLife();
+				}
 			}
-		}
-		
-		// apply damage
-		// NOTE: making an assumption that something like this exists for damageable items
-		if (IHealthComponentInterface* HealthInterface = Cast<IHealthComponentInterface>(Hit.Item))
+			// apply damage
+			
+		} 
+		else if (ProjectileDefinition.bCanBounce) // we bouncin?
 		{
-			UHealthComponentHealthInterface->GetHealthComponent()->ApplyDamage(ProjectileDefinition.Damage);
+			if (ProjectileDefinition.DamageOnBounce > 0)
+			{
+				HealthComponent->ApplyDamage(ProjectileDefinition.DamageOnBounce);
+			}
+
+			// calculate new trajectory
 		}
 	}
 
@@ -57,6 +76,17 @@ void UKraissProjectileMovementComponent::TickComponent(float DeltaTime, ELevelTi
 	{
 		OnProjectileStop.Broadcast(Hit);	
 	}
+}
+
+void UKraissProjectileMovementComponent::HandleEndOfLife()
+{
+	if (ProjectileDefinition.DamageType == EDamageType::Radial)
+	{
+		// TODO sphere sweep for damage to everything we hit
+	}
+
+	// tear down
+	OnEndOfLife.Broadcast();
 }
 
 // modified from UProjectileMovementComponent.cpp
@@ -82,9 +112,8 @@ FVector UKraissProjectileMovementComponent::ComputeAcceleration(const FVector& I
 	FVector Acceleration(FVector::ZeroVector);
 
 	Acceleration.Z += GetGravityZ();
-	//TODO friction!!
 
-	// TODO: calculate the pending force to add (or 'subtract') for option of gas fueled projectiles
+	// TODO: check if we are at max speed to see if we should add (or 'subtract') for option of gas fueled projectiles
 	// Acceleration += PendingForce;
 	
 	return Acceleration;
@@ -93,11 +122,10 @@ FVector UKraissProjectileMovementComponent::ComputeAcceleration(const FVector& I
 // modified from UProjectileMovementComponent.cpp
 FVector UKraissProjectileMovementComponent::LimitVelocity(FVector NewVelocity) const
 {
-	const float CurrentMaxSpeed = ProjectileDefinition.MaxSpeed;
-	if (CurrentMaxSpeed > 0.f)
+	if (ProjectileDefinition.MaxSpeed != 0.0f || ProjectileDefinition.MinSpeed != 0.0f)
 	{
-		NewVelocity = NewVelocity.GetClampedToMaxSize(CurrentMaxSpeed);
+		NewVelocity = NewVelocity.GetClampedToSize(ProjectileDefinition.MinSpeed, ProjectileDefinition.MaxSpeed);
 	}
-
+	
 	return ConstrainDirectionToPlane(NewVelocity);
 }
